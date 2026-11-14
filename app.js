@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '1.0.1';
+const VERSION = '1.0.3';
 const GAMES_KEY = 'dgscore.games.v1';
 const NAMES_KEY = 'dgscore.recentNames.v1';
 
@@ -954,7 +954,7 @@ function flush() {
   saveGame(game);
 }
 
-function goHole(delta) {
+function goHole(delta, playerIndex = 0) {
   const game = currentGame();
   if (!game) return;
 
@@ -970,10 +970,58 @@ function goHole(delta) {
   saveGame(game);
 
   ui.hole = next;
-  ui.activePlayer = 0;
-  resetCellEditor(game, next, 0);
+  ui.activePlayer = playerIndex;
+  resetCellEditor(game, next, playerIndex);
 
   renderScore();
+}
+
+/* Столбец заполнен целиком: у всех игроков есть счёт в текущей корзине.
+   Учитывается и значение, которое пользователь набирает прямо сейчас, —
+   иначе после ввода последней цифры стрелка всё равно вела бы по строкам */
+function holeIsComplete(game, hole) {
+  return game.players.every((_, p) => {
+    if (hole === ui.hole && p === ui.activePlayer) return activeThrows() !== null;
+    return cellValue(game, hole, p) !== null;
+  });
+}
+
+/* Стрелки ведут фокус по игрокам текущей корзины: счёт вводится сверху
+   вниз, от первого игрока к последнему. Только на краю столбца фокус
+   переходит на соседнюю корзину — вниз к первому игроку, вверх
+   к последнему, чтобы движение по столбцу не прерывалось.
+   Если же счёт проставлен у всех игроков, ходить по строкам незачем:
+   стрелки сразу перелистывают корзины, как раньше */
+function moveFocus(delta) {
+  const game = currentGame();
+  if (!game) return;
+
+  if (holeIsComplete(game, ui.hole)) {
+    goHole(delta, 0);
+    return;
+  }
+
+  const playerCount = game.players.length;
+  const nextPlayer = ui.activePlayer + delta;
+
+  if (nextPlayer >= 0 && nextPlayer < playerCount) {
+    commitCell();
+    saveGame(game);
+    ui.activePlayer = nextPlayer;
+    resetCellEditor(game, ui.hole, nextPlayer);
+    renderScore();
+    return;
+  }
+
+  goHole(delta, delta > 0 ? 0 : playerCount - 1);
+}
+
+function handleKey(key) {
+  if (/^[0-9]$/.test(key)) return handleDigit(key);
+  if (key === 'back') return handleBackspace();
+  if (key === 'pen') return handlePen();
+  if (key === 'prev') return moveFocus(-1);
+  if (key === 'next') return moveFocus(1);
 }
 
 function handleDigit(digit) {
@@ -998,14 +1046,6 @@ function handleBackspace() {
 function handlePen() {
   ui.draftPenalty = !ui.draftPenalty;
   renderScore();
-}
-
-function handleKey(key) {
-  if (/^[0-9]$/.test(key)) return handleDigit(key);
-  if (key === 'back') return handleBackspace();
-  if (key === 'pen') return handlePen();
-  if (key === 'prev') return goHole(-1);
-  if (key === 'next') return goHole(1);
 }
 
 function leaveScore() {
@@ -1742,10 +1782,32 @@ function editFromSummary() {
   requestWakeLock();
 }
 
+/* Клавиши срабатывают по pointerdown, а не по click. На iOS click
+   доставляется в точку touchend: если палец при тапе сместился вверх,
+   событие уходило в ячейку сетки над клавиатурой и переключало игрока
+   вместо перелистывания корзины. pointerdown фиксирует нажатие там,
+   где палец коснулся кнопки, а парный click после него подавляется. */
 document.querySelectorAll('.key').forEach((key) => {
-  key.addEventListener('click', () => {
+  let lastPress = 0;
+
+  const press = (ev) => {
+    lastPress = Date.now();
     handleKey(key.getAttribute('data-key'));
     resetWakeTimer();
+  };
+
+  key.addEventListener('pointerdown', press);
+
+  /* Фолбэк для браузеров без Pointer Events */
+  if (!window.PointerEvent) {
+    key.addEventListener('touchstart', press, { passive: true });
+    key.addEventListener('mousedown', press);
+  }
+
+  key.addEventListener('click', (ev) => {
+    /* click сразу после pointerdown — это то же нажатие, уже обработанное */
+    if (Date.now() - lastPress < 600) return;
+    press(ev);
   });
 });
 
@@ -1832,6 +1894,57 @@ function safeInset(name) {
   return probe ? probe.trim() : '';
 }
 
+function isStandalone() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    window.navigator.standalone === true;
+}
+
+/* Сенсорный экран: на десктопном PWA окно не занимает весь экран,
+   поэтому размеры screen там не годятся в качестве высоты приложения */
+function isTouchDevice() {
+  return (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
+}
+
+/* В standalone-PWA на iOS 26 единицы 100dvh/100vh считаются без верхней
+   safe-area (на iPhone XS — 768 px вместо 812), поэтому низ экрана
+   оставался пустым на высоту выреза, а клавиатура ввода счёта уезжала
+   вверх. В standalone окно занимает экран целиком, поэтому высоту берём
+   у screen (в CSS-пикселях, уже с обеими safe-area).
+   В обычном браузере высоту не трогаем — там 100dvh считает сам Safari,
+   а подмена на innerHeight сломала бы поведение при появлении
+   системной клавиатуры. */
+function updateAppHeight() {
+  const root = document.documentElement;
+
+  if (!isStandalone() || !isTouchDevice()) {
+    root.style.removeProperty('--app-h');
+    return;
+  }
+
+  let h = window.innerHeight;
+
+  if (window.screen) {
+    const sw = window.screen.width || 0;
+    const sh = window.screen.height || 0;
+    /* В портрете нужна большая сторона экрана, в ландшафте — меньшая */
+    const full = sw > sh ? Math.min(sw, sh) : Math.max(sw, sh);
+
+    /* Экран выше вьюпорта максимум на сумму safe-area — это десятки
+       пикселей. Всё, что больше, — физические пиксели или внешний
+       монитор: такое значение игнорируем */
+    if (full > h && full - h <= 160) h = full;
+  }
+
+  /* Открыта системная клавиатура: visualViewport сжимается заметно
+     сильнее, чем на высоту safe-area. В этом случае приложение
+     подстраивается под него, чтобы поле ввода не ушло под клавиатуру */
+  const vv = window.visualViewport;
+  if (vv && vv.height && vv.height < h - 100) h = Math.round(vv.height);
+
+  if (h > 0) root.style.setProperty('--app-h', h + 'px');
+  else root.style.removeProperty('--app-h');
+}
+
 function renderDebug() {
   const box = document.getElementById('debug-panel');
   if (!box) return;
@@ -1840,7 +1953,10 @@ function renderDebug() {
     'viewport ' + window.innerWidth + '×' + window.innerHeight,
     'visual ' + (window.visualViewport ? Math.round(window.visualViewport.width) + '×' + Math.round(window.visualViewport.height) : '—'),
     'dpr ' + window.devicePixelRatio,
+    'screen ' + (window.screen ? window.screen.width + '×' + window.screen.height : '—'),
     'safe ' + safeInset('--safe-t') + ' / ' + safeInset('--safe-b'),
+    'app ' + safeInset('--app-h'),
+    'standalone ' + (isStandalone() ? 'да' : 'нет'),
     'ориентация ' + (window.matchMedia('(orientation: landscape)').matches ? 'landscape' : 'portrait'),
     'версия v' + VERSION,
   ];
@@ -1873,6 +1989,16 @@ function onOrientationChange() {
 renderVersion();
 initTheme();
 initDebug();
+updateAppHeight();
+
+window.addEventListener('resize', updateAppHeight);
+window.addEventListener('orientationchange', () => setTimeout(updateAppHeight, 150));
+if (window.matchMedia) {
+  const standaloneQuery = window.matchMedia('(display-mode: standalone)');
+  if (standaloneQuery.addEventListener) {
+    standaloneQuery.addEventListener('change', updateAppHeight);
+  }
+}
 
 if (navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
@@ -1892,6 +2018,7 @@ if (window.screen && window.screen.orientation) {
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', () => {
     document.documentElement.style.setProperty('--vvh', window.visualViewport.height + 'px');
+    updateAppHeight();
   });
 }
 

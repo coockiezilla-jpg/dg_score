@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dgscore-v1.0.33';
+const CACHE_NAME = 'dgscore-v1.0.3-20261115-0054';
 
 const ASSETS = [
   './',

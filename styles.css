@@ -47,6 +47,12 @@
 
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
+
+  /* Высота вьюпорта приложения. В браузере — динамическая высота.
+     В standalone-PWA на iOS 26 эта единица считается без верхней
+     safe-area (768 px вместо 812 на iPhone XS), поэтому там высоту
+     выставляет app.js по размерам экрана устройства. */
+  --app-h: 100dvh;
 }
 
 /* Светлая тема: тёплая пастельная палитра — кремовый фон,
@@ -120,7 +126,7 @@ body {
 }
 
 .app {
-  height: 100dvh;
+  height: var(--app-h);
   display: flex;
   flex-direction: column;
 }
@@ -128,7 +134,7 @@ body {
 .screen {
   display: none;
   flex-direction: column;
-  height: 100dvh;
+  height: var(--app-h);
   padding-top: var(--safe-t);
 }
 
@@ -346,28 +352,37 @@ body {
 .theme-switch {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   pointer-events: auto;
 }
 
-/* Иконки солнца и луны: всегда белые, независимо от темы.
-   На светлом фоне белый глиф виден за счёт лёгкой тени */
+/* Иконки солнца и луны — встроенный SVG, а не символы шрифта:
+   так они выглядят одинаково на всех устройствах и не подменяются
+   системными emoji */
 .theme-icon {
-  font-size: 18px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   color: #ffffff;
   opacity: 0.85;
-  text-shadow: 0 0 2px rgba(0, 0, 0, 0.45);
 }
 
-/* Сам свитч: 44×26, зона нажатия растянута до 44 px по высоте */
+.theme-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Сам свитч: 40×24, зона нажатия растянута до 44 px по высоте */
 .theme-toggle {
   position: relative;
-  width: 44px;
-  height: 26px;
+  width: 40px;
+  height: 24px;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 13px;
+  border-radius: 12px;
   /* Дорожка и ручка белые: элементы свитча читаются одинаково
      в обеих темах */
   background: rgba(255, 255, 255, 0.28);
@@ -382,16 +397,16 @@ body {
   position: absolute;
   left: -10px;
   right: -10px;
-  top: -9px;
-  bottom: -9px;
+  top: -10px;
+  bottom: -10px;
 }
 
 .theme-toggle-knob {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #ffffff;
   transition: transform 0.15s ease-out;
@@ -399,7 +414,7 @@ body {
 
 /* Тёмная тема — ручка справа; светлая — слева */
 :root[data-theme="dark"] .theme-toggle-knob {
-  transform: translateX(18px);
+  transform: translateX(16px);
 }
 
 /* На светлом фоне белая дорожка сливалась бы с фоном —
@@ -412,7 +427,6 @@ body {
 /* В светлой теме иконки того же тона, что и дорожка свитча */
 :root[data-theme="light"] .theme-icon {
   color: #cbbda6;
-  text-shadow: none;
 }
 
 #screen-menu {
@@ -735,8 +749,11 @@ body {
   flex-direction: column;
   justify-content: center;
   overflow: hidden;
-  /* Слева отступ больше: имена не должны прилипать к краю экрана */
-  padding: 0 6px 8px 14px;
+  /* Слева отступ больше: имена не должны прилипать к краю экрана.
+     Снизу запас побольше: сетка вплотную над клавиатурой, и при тапе
+     по стрелкам палец иногда задевал ячейку — теперь клавиши ловят
+     нажатие по pointerdown, но лишний зазор всё равно полезен */
+  padding: 0 6px 14px 14px;
 }
 
 .score-grid {
@@ -918,10 +935,19 @@ body {
   justify-content: center;
   touch-action: manipulation;
   font-variant-numeric: tabular-nums;
+  /* Подсветка нажатия: цвет меняется сразу, отклик ощущается мгновенно,
+     а плавно анимируется только transform — дешёвый композитинг без
+     пересчёта лэйаута */
+  transition: transform 0.08s ease-out;
 }
 
-.key:active {
+/* :active — для мыши и браузеров, где он отрабатывает надёжно;
+   .pressed ставит app.js по pointerdown, поэтому нажатие видно и там,
+   где :active запаздывает или не срабатывает вовсе */
+.key:active,
+.key.pressed {
   background: var(--accent-dim);
+  transform: scale(0.94);
 }
 
 .key.fn {

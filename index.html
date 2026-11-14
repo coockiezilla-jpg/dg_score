@@ -38,6 +38,31 @@
   } catch (e) {
     document.documentElement.setAttribute('data-theme', 'dark');
   }
+
+  /* Высота приложения — тоже до первой отрисовки. В standalone-PWA
+     на iOS 26 100dvh считается без верхней safe-area, из-за чего низ
+     экрана пустовал на высоту выреза; в standalone окно занимает экран
+     целиком, поэтому берём высоту у screen (уже в CSS-пикселях).
+     В браузере переменная не ставится — там 100dvh считает Safari.
+     В app.js та же логика пересчитывается на resize и поворот. */
+  (function () {
+    var standalone = (window.matchMedia &&
+      window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+    var touch = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
+    if (!standalone || !touch) return;
+
+    var h = window.innerHeight;
+    if (window.screen) {
+      var sw = window.screen.width || 0;
+      var sh = window.screen.height || 0;
+      var full = sw > sh ? Math.min(sw, sh) : Math.max(sw, sh);
+      if (full > h && full - h <= 160) h = full;
+    }
+    if (h > 0) {
+      document.documentElement.style.setProperty('--app-h', h + 'px');
+    }
+  })();
 </script>
 </head>
 <body>
@@ -57,7 +82,14 @@
     </div>
     <div class="menu-footer">
       <div class="theme-switch">
-        <span class="theme-icon" aria-hidden="true">☀</span>
+        <!-- Иконки — встроенный SVG, а не символы ☀/☾: глифы шрифта
+             на разных устройствах подменяются системными emoji -->
+        <span class="theme-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="4.2" />
+            <path d="M12 2.4v2.6M12 19v2.6M2.4 12H5M19 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9" />
+          </svg>
+        </span>
         <button
           class="theme-toggle"
           id="theme-toggle"
@@ -68,7 +100,11 @@
         >
           <span class="theme-toggle-knob"></span>
         </button>
-        <span class="theme-icon" aria-hidden="true">☾</span>
+        <span class="theme-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.8 13.6A8.8 8.8 0 1 1 10.4 3.2a7.1 7.1 0 0 0 10.4 10.4z" />
+          </svg>
+        </span>
       </div>
     </div>
     <div class="version" id="version-label"></div>
