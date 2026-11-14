@@ -1,0 +1,1426 @@
+:root {
+  --bg: #0e1116;
+  --bg-elev: #161b22;
+  --bg-elev-2: #1d242d;
+  --line: #2a323d;
+  --line-soft: #222932;
+  --text: #e6edf3;
+  --text-dim: #8b98a8;
+  --text-faint: #5a6675;
+  --accent: #4fb3ff;
+  --accent-dim: #1f4d6e;
+  --ok: #3fb950;
+  --ok-soft: rgba(63, 185, 80, 0.16);
+  --warn: #e5534b;
+  --warn-soft: rgba(229, 83, 75, 0.18);
+  --pen: #e5534b;
+
+  /* Полупрозрачные производные: отдельно, чтобы светлая тема
+     не тащила тёмные оттенки акцента и предупреждения */
+  --accent-soft: rgba(79, 179, 255, 0.09);
+  --accent-soft-2: rgba(79, 179, 255, 0.1);
+  --accent-line: rgba(79, 179, 255, 0.2);
+  --accent-line-2: rgba(79, 179, 255, 0.28);
+  --ok-line: rgba(63, 185, 80, 0.5);
+  --ok-border-w: 1px;
+  --warn-line: rgba(229, 83, 75, 0.45);
+  --pen-line: rgba(229, 83, 75, 0.5);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --scrim-strong: rgba(0, 0, 0, 0.72);
+  --on-accent: #06121c;
+
+  /* Фон ячеек прошлых и текущей корзины */
+  --past-bg: var(--bg-elev);
+  --current-bg: var(--accent-soft-2);
+
+  --name-w: 76px;
+  --col-w: 46px;
+  --sum-w: 44px;
+  --cell-w: 75px;
+  --gap: 2px;
+
+  /* Шрифты экрана ввода счёта */
+  --f-name: 19px;
+  --f-head: 17px;
+  --f-cell: 19px;
+  --f-sum: 18px;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+/* Светлая тема: тёплая пастельная палитра — кремовый фон,
+   приглушённые тёплые акценты, без чистого белого и чистого чёрного.
+   Переключается атрибутом data-theme на <html>.
+
+   Красные переменные (--warn, --warn-soft, --warn-line, --pen, --pen-line)
+   намеренно оставлены прежними: подсветка пустых ячеек, линия штрафа,
+   кнопка PEN, предупреждение о неполных корзинах и клетки итогов
+   должны выглядеть одинаково в обеих темах */
+:root[data-theme="light"] {
+  --bg: #f6f0e6;
+  --bg-elev: #fdfaf4;
+  --bg-elev-2: #ece3d4;
+  --line: #d8cbb6;
+  --line-soft: #e7ddcc;
+  --text: #33291f;
+  --text-dim: #6d6152;
+  --text-faint: #9b8f7e;
+  --accent: #b4763c;
+  --accent-dim: #f0e0c9;
+  --ok: #7a9463;
+  --ok-soft: rgba(122, 148, 99, 0.16);
+  --warn: #cc3a31;
+  --warn-soft: rgba(204, 58, 49, 0.12);
+  --pen: #cc3a31;
+
+  --accent-soft: rgba(180, 118, 60, 0.1);
+  --accent-soft-2: rgba(180, 118, 60, 0.13);
+  --accent-line: rgba(180, 118, 60, 0.3);
+  --accent-line-2: rgba(180, 118, 60, 0.42);
+  --ok-line: rgba(122, 148, 99, 0.55);
+  /* На тёплом светлом фоне зелёная рамка в 1 px почти теряется —
+     в светлой теме она толще и плотнее */
+  --ok-border-w: 2px;
+  --warn-line: rgba(204, 58, 49, 0.4);
+  --pen-line: rgba(204, 58, 49, 0.45);
+  --scrim: rgba(51, 41, 31, 0.35);
+  --scrim-strong: rgba(51, 41, 31, 0.65);
+  --on-accent: #fffaf2;
+
+  /* В светлой теме акцент мягкий, поэтому ячейки меняются местами:
+     прошлые корзины получают акцентную подложку, а текущая —
+     светлый фон, чтобы активный столбец читался как «чистый лист» */
+  --past-bg: var(--accent-soft-2);
+  --current-bg: var(--bg-elev);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+.app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  padding-top: var(--safe-t);
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* ---------- Общие элементы ---------- */
+
+.btn {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  border: none;
+  border-radius: 10px;
+  padding: 0 16px;
+  min-height: 44px;
+  color: var(--text);
+  background: var(--bg-elev-2);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: opacity 0.12s linear;
+}
+
+.btn:active {
+  opacity: 0.6;
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.btn.secondary {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--accent);
+  padding: 0 8px;
+  font-size: 17px;
+}
+
+.btn.danger {
+  background: var(--warn);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.btn.link {
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  min-height: 32px;
+  padding: 0 6px;
+}
+
+.btn.block {
+  display: block;
+  width: 100%;
+}
+
+.btn.step {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+  /* Стрелки центрируем флексом: глифы ← и → шире своего кегля,
+     и при обычном text-align они выглядят смещёнными */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+}
+
+.btn.chip {
+  min-width: 64px;
+  height: 40px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  font-size: 15px;
+}
+
+.btn.chip.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 12px;
+  flex: 0 0 auto;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-spacer {
+  width: 48px;
+  flex: 0 0 auto;
+}
+
+/* Лаконичная монограмма в шапке экрана ввода счёта */
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Кнопки по краям, монограмма строго по центру */
+#screen-score .topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+#screen-score .topbar .btn:first-child {
+  justify-self: start;
+}
+
+#screen-score .topbar .btn:last-child {
+  justify-self: end;
+}
+
+#screen-score .topbar .topbar-logo {
+  justify-self: center;
+  padding: 0 8px;
+}
+
+.topbar-logo-main {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  color: var(--text);
+}
+
+.topbar-logo-sub {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: lowercase;
+  color: var(--accent);
+  opacity: 0.9;
+}
+
+.content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px 16px;
+}
+
+.bottom-bar {
+  flex: 0 0 auto;
+  padding: 8px 16px calc(8px + var(--safe-b));
+  background: var(--bg);
+  border-top: 1px solid var(--line-soft);
+}
+
+.bottom-bar.col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.version {
+  position: absolute;
+  left: 14px;
+  bottom: calc(6px + var(--safe-b));
+  font-size: 10px;
+  color: var(--text-faint);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* ---------- Меню ---------- */
+
+/* Подвал меню: переключатель темы по центру, версия — в левом углу */
+.menu-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(6px + var(--safe-b));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.theme-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* Иконки солнца и луны: всегда белые, независимо от темы.
+   На светлом фоне белый глиф виден за счёт лёгкой тени */
+.theme-icon {
+  font-size: 18px;
+  line-height: 1;
+  color: #ffffff;
+  opacity: 0.85;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.45);
+}
+
+/* Сам свитч: 44×26, зона нажатия растянута до 44 px по высоте */
+.theme-toggle {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 13px;
+  /* Дорожка и ручка белые: элементы свитча читаются одинаково
+     в обеих темах */
+  background: rgba(255, 255, 255, 0.28);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s linear;
+}
+
+.theme-toggle::before {
+  /* Невидимая зона нажатия: палец попадает даже мимо дорожки */
+  content: '';
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  top: -9px;
+  bottom: -9px;
+}
+
+.theme-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 0.15s ease-out;
+}
+
+/* Тёмная тема — ручка справа; светлая — слева */
+:root[data-theme="dark"] .theme-toggle-knob {
+  transform: translateX(18px);
+}
+
+/* На светлом фоне белая дорожка сливалась бы с фоном —
+   делаем её тёплой бежевой, чтобы белая ручка читалась */
+:root[data-theme="light"] .theme-toggle {
+  background: #cbbda6;
+  border-color: #bdae95;
+}
+
+/* В светлой теме иконки того же тона, что и дорожка свитча */
+:root[data-theme="light"] .theme-icon {
+  color: #cbbda6;
+  text-shadow: none;
+}
+
+#screen-menu {
+  position: relative;
+  justify-content: center;
+}
+
+.menu-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 24px;
+}
+
+.menu-logo {
+  text-align: center;
+  margin-bottom: 72px;
+  transform: translateY(-60px);
+}
+
+.menu-logo-main {
+  font-size: 58px;
+  font-weight: 700;
+  letter-spacing: -1.5px;
+  line-height: 1.05;
+}
+
+.menu-logo-sub {
+  font-size: 42px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 2.5px;
+  margin-top: -2px;
+}
+
+.menu-logo-note {
+  font-size: 17px;
+  color: var(--text-dim);
+  margin-top: 16px;
+}
+
+/* ---------- Список игр ---------- */
+
+.game-row {
+  background: var(--bg-elev);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.game-row-open {
+  margin: -4px -6px 0;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.game-row-open:active {
+  background: var(--bg-elev-2);
+}
+
+.game-row-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.game-row-name {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Имена игроков: до трёх строк, дальше — многоточие.
+   -webkit-line-clamp работает и в Safari на iOS */
+.game-row-players {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+.game-row-date {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-row-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.game-row-actions .btn {
+  flex: 1 1 auto;
+  min-height: 36px;
+  font-size: 14px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+}
+
+.game-row-actions .btn.danger-ghost {
+  color: var(--warn);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 48px 16px;
+}
+
+/* ---------- Настройка ---------- */
+
+.block {
+  background: var(--bg-elev);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.suggest-box {
+  flex: 0 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0 2px;
+}
+
+.suggest-item {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  min-height: 34px;
+  touch-action: manipulation;
+}
+
+.suggest-item:active {
+  background: var(--accent-dim);
+}
+
+.player-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+}
+
+.player-input::placeholder {
+  color: var(--text-faint);
+}
+
+.player-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.player-input.invalid {
+  border-color: var(--warn);
+}
+
+/* Поле названия игры занимает всю ширину блока */
+#game-name-input {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.player-remove {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 44px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.stepper-value {
+  font-size: 26px;
+  font-weight: 600;
+  min-width: 56px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.quick-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* Корзины: чипы 9/18 слева, степпер справа */
+.holes-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.holes-row .quick-row {
+  flex: 0 0 auto;
+}
+
+.holes-row .stepper {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.holes-row .stepper-value {
+  min-width: 44px;
+  font-size: 22px;
+}
+
+.block.compact {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.block.compact .block-head {
+  margin-bottom: 8px;
+}
+
+.block.compact .btn.step {
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+}
+
+.block.compact .btn.chip {
+  min-width: 48px;
+  height: 36px;
+  font-size: 14px;
+}
+
+.players-list + .btn.link {
+  margin-top: 10px;
+  width: 100%;
+  min-height: 40px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+/* ---------- Ввод счёта ---------- */
+
+#screen-score {
+  overflow: hidden;
+}
+
+.score-wrap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  /* Слева отступ больше: имена не должны прилипать к краю экрана */
+  padding: 0 6px 8px 14px;
+}
+
+.score-grid {
+  display: grid;
+  /* Имя забирает всё свободное место, поэтому корзины и «Итог» уходят
+     правее, а именам достаётся больше ширины */
+  grid-template-columns: minmax(0, 1fr) repeat(3, var(--cell-w)) var(--sum-w);
+  gap: var(--gap);
+  align-items: center;
+  justify-content: stretch;
+  width: 100%;
+  flex: 0 0 auto;
+  position: relative;
+}
+
+/* Подложка столбца текущей корзины: подсвечивает, куда вводится счёт */
+.col-bg {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 10px;
+  pointer-events: none;
+  align-self: stretch;
+  justify-self: stretch;
+  margin: -6px 0;
+  z-index: 0;
+}
+
+.grid-head,
+.player-name,
+.cell {
+  position: relative;
+  z-index: 1;
+}
+
+/* Тонкие линии между строками: от начала имён до конца столбца «Итог» */
+.row-line {
+  position: relative;
+  z-index: 2;
+  align-self: start;
+  height: 0;
+  margin-top: calc(var(--gap) / -2);
+  border-top: 1px solid var(--line-soft);
+  pointer-events: none;
+}
+
+.grid-head {
+  font-size: var(--f-head);
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  padding-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.grid-head.current {
+  color: var(--accent);
+}
+
+/* Заголовок выровнен строго по центру столбца «Итог» */
+.grid-head.sum {
+  color: var(--text-dim);
+  text-align: center;
+  padding-right: 0;
+  margin-left: 0;
+}
+
+.player-name {
+  font-size: var(--f-name);
+  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  color: var(--text);
+  padding-right: 4px;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.cell {
+  position: relative;
+  width: var(--cell-w);
+  height: var(--cell-w);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--f-cell);
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.cell.sum,
+.cell.placeholder {
+  width: auto;
+  height: auto;
+}
+
+.cell.past {
+  color: var(--text-dim);
+  background: var(--past-bg);
+}
+
+.cell.current {
+  /* Полупрозрачно, чтобы подложка столбца читалась и под самими клетками */
+  background: var(--current-bg);
+  border-color: var(--accent-line-2);
+}
+
+.cell.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.cell.filled {
+  border-color: var(--ok-line);
+  border-width: var(--ok-border-w);
+}
+
+.cell.empty {
+  border-color: var(--line);
+  color: var(--text-faint);
+}
+
+.cell.empty.warn {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.cell .pen-bar {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 3px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--pen);
+}
+
+.cell.sum {
+  background: transparent;
+  border: none;
+  font-weight: 600;
+  font-size: var(--f-sum);
+  justify-content: center;
+  padding-right: 0;
+  color: var(--text);
+  margin-left: 0;
+}
+
+/* ---------- Клавиатура ---------- */
+
+.keypad {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(3, var(--key-h, 52px));
+  gap: 6px;
+  padding: 8px 8px calc(8px + var(--safe-b));
+  background: var(--bg);
+  border-top: 1px solid var(--line-soft);
+}
+
+.key {
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  font-variant-numeric: tabular-nums;
+}
+
+.key:active {
+  background: var(--accent-dim);
+}
+
+.key.fn {
+  font-size: 20px;
+  color: var(--accent);
+}
+
+.key:disabled {
+  color: var(--text-faint);
+  opacity: 0.4;
+}
+
+/* Высокие стрелки: занимают 2-й и 3-й ряды */
+.key.tall {
+  grid-row: span 2;
+  font-size: 24px;
+}
+
+.key.tall.left {
+  grid-column: 1;
+  grid-row: 2 / span 2;
+}
+
+.key.tall.right {
+  grid-column: 5;
+  grid-row: 2 / span 2;
+}
+
+.key.pen {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--pen);
+  border-color: var(--pen-line);
+}
+
+.key.pen.on {
+  background: var(--warn-soft);
+  border-color: var(--pen);
+}
+
+/* ---------- Итоги ---------- */
+
+/* Название игры под заголовком «Результаты»: акцентная полоса слева,
+   чтобы отличалось от заголовка окна, но оставалось в стиле приложения */
+.summary-game-name {
+  position: relative;
+  margin-bottom: 12px;
+  padding: 2px 0 2px 10px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-game-name::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1px;
+  bottom: 1px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.summary-warn {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+/* Таблица, столбец имён и «Итог» — три блока в ряд: горизонтальная прокрутка
+   идёт только под ячейками корзин, имена и суммы не двигаются */
+.summary-body {
+  /* Квадратные ячейки 44 px, как на экране ввода счёта */
+  --s-name-w: 84px;
+  /* Зазор после имён: первая корзина не прилипает к тексту */
+  --s-name-gap: 6px;
+  --s-cell-w: 44px;
+  --s-sum-w: 44px;
+  --sum-cell-w: var(--s-cell-w);
+  /* Зазор между прокручиваемыми корзинами и столбцом «Итог» */
+  --s-sum-gap: 8px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.summary-table-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: var(--s-name-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.summary-names {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: var(--s-name-w);
+  gap: var(--gap);
+  align-items: center;
+}
+
+.summary-sums {
+  flex: 0 0 auto;
+  display: grid;
+  grid-auto-rows: min-content;
+  align-content: start;
+  align-items: center;
+  margin-left: var(--s-sum-gap);
+  gap: var(--gap);
+}
+
+/* Подсказка о прокрутке — тем же серым, что номера корзин */
+.summary-scroll-hint {
+  margin-top: 10px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: center;
+}
+
+.summary-scroll-hint[hidden] {
+  display: none;
+}
+
+/* Таблица как на экране ввода: только корзины, имена вынесены влево */
+.summary-grid {
+  display: grid;
+  gap: var(--gap);
+  align-items: center;
+  justify-content: start;
+  width: max-content;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Линии строк в таблице результатов идут поверх имён и ячеек,
+   как и на экране ввода счёта */
+.summary-grid .row-line,
+.summary-names .row-line,
+.summary-sums .row-line {
+  z-index: 1;
+}
+
+.s-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  padding-bottom: 4px;
+}
+
+.s-head.s-name {
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+
+/* Кнопка «Изменить» в шапке таблицы результатов: выглядит компактно,
+   но зона нажатия увеличена за счёт отступов без роста строки */
+.s-head.s-name .btn.ghost {
+  padding: 8px 0;
+  margin: -8px 0;
+  min-height: 0;
+  line-height: 1.1;
+  white-space: nowrap;
+  hyphens: none;
+  overflow: visible;
+}
+
+.s-name {
+  font-size: 15px;
+  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-right: 6px;
+  color: var(--text);
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  min-height: var(--s-cell-w);
+}
+
+.s-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--sum-cell-w);
+  height: var(--sum-cell-w);
+  font-size: 15px;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-soft);
+  color: var(--text);
+}
+
+.s-cell.empty-cell {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+}
+
+.s-cell.pen-cell {
+  padding-top: 6px;
+}
+
+.s-cell.pen-cell::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  top: 3px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--pen);
+}
+
+/* Столбец суммы стоит рядом с прокручиваемой таблицей, поэтому не требует
+   sticky: прокрутка корзин обрезается по его левой границе */
+.s-cell.s-sum {
+  width: var(--s-sum-w);
+  height: var(--s-sum-w);
+  min-width: 0;
+  background: var(--bg-elev-2);
+  border-color: var(--line);
+  border-left-width: 2px;
+  font-weight: 700;
+}
+
+.s-cell.s-sum.incomplete {
+  color: var(--warn);
+}
+
+.s-head.s-sum-head {
+  width: var(--s-sum-w);
+  background: var(--bg);
+  font-size: 12px;
+}
+
+/* ---------- Модалка ---------- */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  width: 100%;
+  max-width: 320px;
+}
+
+/* Заголовок модалки: по центру, акцентным цветом, с тонкой линией
+   снизу. Цвета берутся из темы, поэтому в тёмной и светлой
+   выглядят по-своему */
+.modal-title {
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--accent);
+  text-align: center;
+}
+
+/* Название игры: прежний шрифт и стиль, но с переносом —
+   длинное название не выходит за границы окна */
+.modal-text {
+  margin: 0 0 16px;
+  font-size: 15px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-actions .btn {
+  flex: 1 1 0;
+}
+
+/* ---------- Тост ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, calc(-50% + 8px));
+  max-width: calc(100% - 32px);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+  z-index: 150;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s linear, transform 0.15s linear;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+/* ---------- Поворот ---------- */
+
+.rotate-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 200;
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+
+.rotate-icon {
+  font-size: 44px;
+}
+
+@media (orientation: landscape) {
+  .rotate-overlay {
+    display: flex;
+  }
+}
+
+/* ---------- Адаптация ---------- */
+
+@media (max-width: 360px) {
+  :root {
+    --name-w: 84px;
+    --col-w: 40px;
+    --sum-w: 48px;
+    --cell-w: 54px;
+    --gap: 2px;
+
+    --f-name: 17px;
+    --f-head: 15px;
+    --f-cell: 17px;
+    --f-sum: 16px;
+  }
+
+  .key {
+    font-size: 20px;
+  }
+
+  .keypad {
+    --key-h: 48px;
+  }
+}
+
+/* Порог подобран под ячейку 75 px: 116 + 3×75 + 64 + отступы = 433 px */
+@media (min-width: 434px) {
+  :root {
+    --name-w: 116px;
+    --sum-w: 64px;
+    --cell-w: 75px;
+    --gap: 3px;
+
+    --f-name: 19px;
+    --f-head: 17px;
+    --f-cell: 19px;
+    --f-sum: 18px;
+  }
+
+  .key {
+    font-size: 23px;
+  }
+
+  .keypad {
+    --key-h: 56px;
+  }
+}
+
+/* 5-6 игроков: компактный режим */
+.score-grid.many-players {
+  --f-name: 17px;
+  --f-head: 15px;
+  --f-cell: 17px;
+  --f-sum: 16px;
+}
+
+@media (max-width: 360px) {
+  .score-grid.many-players {
+    --name-w: 76px;
+    --sum-w: 44px;
+    --cell-w: 48px;
+
+    --f-name: 15px;
+    --f-head: 14px;
+    --f-cell: 15px;
+    --f-sum: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .summary-body {
+    --s-name-w: 72px;
+    --s-sum-gap: 6px;
+  }
+
+  .s-name {
+    font-size: 14px;
+  }
+
+  /* Кнопка «Изменить» должна целиком влезать в узкий столбец имён */
+  .s-head.s-name .btn.ghost {
+    font-size: 14px;
+    padding: 8px 2px 8px 0;
+  }
+
+  .s-cell {
+    font-size: 14px;
+  }
+
+  .s-head {
+    font-size: 12px;
+  }
+
+  .s-head.s-sum-head {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 360px) {
+  .menu-logo-main {
+    font-size: 46px;
+  }
+
+  .menu-logo-sub {
+    font-size: 34px;
+  }
+
+  .menu-logo {
+    margin-bottom: 52px;
+    transform: translateY(-40px);
+  }
+}
+
+/* Светлая тема для скриншотов-итогов задаётся в canvas, здесь только тёмная */
+
+/* ---------- Debug (?debug=1) ---------- */
+
+.debug-panel {
+  position: fixed;
+  bottom: calc(var(--safe-b) + 4px);
+  right: 4px;
+  z-index: 999;
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--scrim-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: pre;
+  text-align: right;
+  pointer-events: none;
+}

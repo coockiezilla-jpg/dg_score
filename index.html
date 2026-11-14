@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DG score</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DG score">
+<meta name="theme-color" content="#0e1116">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+
+<!-- Заставки при запуске с домашнего экрана (порядок: сначала точные модели) -->
+<link rel="apple-touch-startup-image" href="splash/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash/splash-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)">
+<link rel="apple-touch-startup-image" href="splash/splash-1080x1920.png" media="(device-width: 360px) and (device-height: 640px) and (-webkit-device-pixel-ratio: 3)">
+<link rel="apple-touch-startup-image" href="splash/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
+
+<link rel="stylesheet" href="styles.css">
+<script>
+  /* Тема применяется до первой отрисовки: иначе при светлой теме
+     на мгновение мелькал бы тёмный фон */
+  try {
+    document.documentElement.setAttribute(
+      'data-theme',
+      localStorage.getItem('dgscore.theme.v1') === 'light' ? 'light' : 'dark'
+    );
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+</script>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Экран 0: главное меню -->
+  <section class="screen" id="screen-menu">
+    <div class="menu-body">
+      <div class="menu-logo">
+        <div class="menu-logo-main">Disc Golf</div>
+        <div class="menu-logo-sub">Score</div>
+        <div class="menu-logo-note">Оффлайн ввод счёта</div>
+      </div>
+      <button class="btn primary block" data-act="new-game">Новая игра</button>
+      <button class="btn secondary block" data-act="open-list">Последние 10 игр</button>
+    </div>
+    <div class="menu-footer">
+      <div class="theme-switch">
+        <span class="theme-icon" aria-hidden="true">☀</span>
+        <button
+          class="theme-toggle"
+          id="theme-toggle"
+          type="button"
+          role="switch"
+          aria-checked="true"
+          aria-label="Тёмная тема"
+        >
+          <span class="theme-toggle-knob"></span>
+        </button>
+        <span class="theme-icon" aria-hidden="true">☾</span>
+      </div>
+    </div>
+    <div class="version" id="version-label"></div>
+  </section>
+
+  <!-- Экран 0b: список игр -->
+  <section class="screen" id="screen-list">
+    <header class="topbar">
+      <span class="topbar-spacer"></span>
+      <h2 class="title">Последние 10 игр</h2>
+      <button class="btn ghost" data-act="list-back">Назад</button>
+    </header>
+    <div class="content" id="games-list"></div>
+  </section>
+
+  <!-- Экран 1: настройка игры -->
+  <section class="screen" id="screen-setup">
+    <header class="topbar">
+      <span class="topbar-spacer"></span>
+      <h2 class="title" id="setup-title">Новая игра</h2>
+      <button class="btn ghost" data-act="setup-cancel" id="setup-back-btn">Назад</button>
+    </header>
+    <div class="content">
+      <div class="block compact" id="block-holes">
+        <div class="block-head">
+          <span>Корзины</span>
+        </div>
+        <div class="holes-row">
+          <div class="quick-row">
+            <button class="btn chip" data-act="holes-9">9</button>
+            <button class="btn chip" data-act="holes-18">18</button>
+          </div>
+          <div class="stepper">
+            <button class="btn step" data-act="holes-minus">−</button>
+            <span class="stepper-value" id="holes-value">18</span>
+            <button class="btn step" data-act="holes-plus">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="block compact" id="block-start">
+        <div class="block-head">
+          <span>Старт с корзины</span>
+        </div>
+        <div class="stepper">
+          <button class="btn step" data-act="start-minus">←</button>
+          <span class="stepper-value" id="start-value">1</span>
+          <button class="btn step" data-act="start-plus">→</button>
+        </div>
+      </div>
+
+      <div class="block" id="block-name">
+        <div class="block-head">
+          <span>Название</span>
+        </div>
+        <input
+          class="player-input"
+          id="game-name-input"
+          type="text"
+          placeholder="Игра"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="sentences"
+          spellcheck="false"
+        >
+      </div>
+
+      <div class="block">
+        <div class="block-head">
+          <span>Игроки</span>
+        </div>
+        <div id="players-list" class="players-list"></div>
+        <button class="btn link block" data-act="add-player">Добавить игрока</button>
+      </div>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn primary block" data-act="setup-start" id="setup-start-btn">Начать игру</button>
+    </div>
+  </section>
+
+  <!-- Экран 2: ввод счёта -->
+  <section class="screen" id="screen-score">
+    <header class="topbar">
+      <button class="btn ghost" data-act="score-back">Назад</button>
+      <div class="topbar-logo" aria-hidden="true">
+        <span class="topbar-logo-main">DG</span>
+        <span class="topbar-logo-sub">score</span>
+      </div>
+      <button class="btn ghost" data-act="score-finish">Завершить</button>
+    </header>
+
+    <div class="score-wrap">
+      <div class="score-grid" id="score-grid"></div>
+    </div>
+
+    <div class="keypad">
+      <button class="key" data-key="0">0</button>
+      <button class="key" data-key="1">1</button>
+      <button class="key" data-key="2">2</button>
+      <button class="key" data-key="3">3</button>
+      <button class="key pen" data-key="pen">PEN</button>
+
+      <button class="key fn tall left" data-key="prev" id="key-prev">←</button>
+      <button class="key" data-key="4">4</button>
+      <button class="key" data-key="5">5</button>
+      <button class="key" data-key="6">6</button>
+      <button class="key fn tall right" data-key="next" id="key-next">→</button>
+
+      <button class="key" data-key="7">7</button>
+      <button class="key" data-key="8">8</button>
+      <button class="key" data-key="9">9</button>
+    </div>
+  </section>
+
+  <!-- Экран 3: итоги -->
+  <section class="screen" id="screen-summary">
+    <header class="topbar">
+      <span class="topbar-spacer"></span>
+      <h2 class="title">Результаты</h2>
+      <span class="topbar-spacer"></span>
+    </header>
+    <div class="content" id="summary-content"></div>
+    <div class="bottom-bar col">
+      <button class="btn primary block" data-act="summary-new">Начать игру</button>
+      <button class="btn secondary block" data-act="summary-list">Последние 10 игр</button>
+      <button class="btn secondary block" data-act="summary-save">Сохранить в галерею</button>
+    </div>
+  </section>
+
+  <!-- Подтверждение -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-card">
+      <h3 class="modal-title" id="modal-title">Удалить игру?</h3>
+      <p class="modal-text" id="modal-text"></p>
+      <div class="modal-actions">
+        <button class="btn secondary" data-act="modal-cancel">Отмена</button>
+        <button class="btn danger" id="modal-ok" data-act="modal-ok">Удалить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Заглушка при повороте -->
+  <div class="rotate-overlay" id="rotate-overlay">
+    <div class="rotate-icon">📱</div>
+    <p>Поверните телефон вертикально</p>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
